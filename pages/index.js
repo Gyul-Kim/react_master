@@ -11,19 +11,28 @@ import { isMemberCheck } from "../provider/auth";
 import { authLogin, socialLoginPop } from "../provider/auth";
 import { SetToken, SetCookie, GetCookie } from "../provider/common";
 import { useRouter } from "next/router";
-import { getMembersFromOnda } from "../pages/api/estimate";
+import { getMembersFromOnda, getMoneyFromOnda } from "../pages/api/estimate";
 
 export default function Home() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [memberData, setMemberData] = useState();
+  const [moneyData, setMoneyData] = useState();
 
   // 회원목록 데이터 불러오기
   const showMembers = async () => {
     try {
       const res = await getMembersFromOnda();
-
       setMemberData(res.data);
+    } catch (e) {
+      console.log("err " + e);
+    }
+  };
+
+  const showMoney = async () => {
+    try {
+      const moneyRes = await getMoneyFromOnda();
+      setMoneyData(moneyRes.data);
     } catch (e) {
       console.log("err " + e);
     }
@@ -34,6 +43,7 @@ export default function Home() {
     isMemberCheck();
     setIsLoading(false);
     showMembers();
+    showMoney();
   }, []);
 
   return (
@@ -41,7 +51,7 @@ export default function Home() {
       <Loading loadingShow={isLoading} />
 
       <div className={style.main_container}>
-        <BoxIndicator />
+        <BoxIndicator data={moneyData} />
         <ChartAll />
         <div className={style.main_btm}>
           <div className={style.btm_title}>
