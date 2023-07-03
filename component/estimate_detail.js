@@ -13,12 +13,14 @@ import {
   useDisclosure,
   Center,
   Box,
+  position,
 } from "@chakra-ui/react";
 import Grid from "@toast-ui/react-grid";
 import TuiGrid from "tui-grid";
 import { loadProgressBar } from "axios-progress-bar";
 import { decodeToken, isLoginCheck } from "../provider/auth";
 import style from "../styles/Home.module.css";
+import $ from "jquery";
 
 import "tui-grid/dist/tui-grid.min.css";
 import "axios-progress-bar/dist/nprogress.css";
@@ -224,6 +226,8 @@ export default function EstimateGrid(props) {
   const [dataSendPartner, setDataSendPartner] = useState();
   const [checkDeleteKey, setCheckDeleteKey] = useState();
   const [closeAllBtn, setCloseAllBtn] = useState(0);
+  const [blockModal, setBlockModal] = useState(0);
+  const [blockReply, setBlockReply] = useState(0);
 
   useEffect(() => {
     initPartnerData();
@@ -270,6 +274,20 @@ export default function EstimateGrid(props) {
       // 모든 견적이 완료되었음을 의미한다.
       if (dataLength == filterOnlyCompleteData.length) {
         setCloseAllBtn(1);
+      }
+
+      // 전체 견적이 미완료일 때, 견적회신하기 막기
+      function findIncomplete(element) {
+        if (element === "incomplete") {
+          return true;
+        }
+      }
+
+      const filterOnlyIncompleteData =
+        checkCompleteDatumStatus.filter(findIncomplete);
+
+      if (dataLength == filterOnlyIncompleteData.length) {
+        setBlockReply(1);
       }
     });
   };
@@ -321,7 +339,7 @@ export default function EstimateGrid(props) {
       minWidth: 130,
     },
     {
-      header: "유통사(명칭)",
+      header: "셀러(명칭)",
       name: "name",
       className: "font12",
       hidden: false,
@@ -456,17 +474,17 @@ export default function EstimateGrid(props) {
     })();
   };
 
-  // [유통사 선택 견적요청하기] 모달창 내 선택 이벤트
+  // [셀러 선택 견적요청하기] 모달창 내 선택 이벤트
   const handleSelect = async () => {
     const rows = ref_partner.current.getInstance().getCheckedRows();
     // 선택한 체크박스가 없을 경우 validation
     if (rows.length == 0) {
-      alert("유통사 검색 후, 체크박스 선택은 필수입니다.");
+      alert("셀러를 선택해 주세요");
       return;
     }
 
     // 선택한 체크박스가 있을 경우 validation
-    // 처음에는 선택한 유통사의 데이터의 상태가 "undefined"
+    // 처음에는 선택한 셀러의 데이터의 상태가 "undefined"
     if (rows.length != 0) {
       if (dataSendPartner === undefined) {
         let dt_ids = rows.map((item) => {
@@ -477,9 +495,9 @@ export default function EstimateGrid(props) {
           };
         });
         setDataSendPartner(dt_ids);
-        // 기존에 선택한 유통사의 데이터 상태가 남이 있음
+        // 기존에 선택한 셀러의 데이터 상태가 남이 있음
       } else {
-        // 삭제 이벤트 클릭 후, 곧바로 선택한 유통사가 [견적대상 유통사] grid로 넘어가도록 한다.
+        // 삭제 이벤트 클릭 후, 곧바로 선택한 셀러가 [견적대상 셀러] grid로 넘어가도록 한다.
         if (checkDeleteKey === "On") {
           let dt_ids = rows.map((item) => {
             return {
@@ -490,14 +508,14 @@ export default function EstimateGrid(props) {
           });
           setDataSendPartner(dt_ids);
           //[checkDeleteKey]의 값을 ""로 줌
-          // 또 다른 유통사를 추가할 때, 기존의 유통사가 유지되면서 새로 추가된 유통사가 추가되도록 하기 위함
+          // 또 다른 셀러를 추가할 때, 기존의 셀러가 유지되면서 새로 추가된 셀러가 추가되도록 하기 위함
           setCheckDeleteKey("");
           return;
         }
 
-        // 기존의 추가된 유통사에 새로운 유통사를 추가할 때,
-        // 기존 추가한 유통사가 삭제가 되지 않도록 함과 동시에,
-        // 새로운 유통사가 그대로 추가되도록 해주는 로직
+        // 기존의 추가된 셀러에 새로운 셀러를 추가할 때,
+        // 기존 추가한 셀러가 삭제가 되지 않도록 함과 동시에,
+        // 새로운 셀러가 그대로 추가되도록 해주는 로직
         let dt_ids = ref_estimate_partner.current.getInstance().getData();
 
         rows.map((item) => {
@@ -519,32 +537,52 @@ export default function EstimateGrid(props) {
     }
   };
 
-  // [유통사 선택 견적요청하기] 모달창 내 삭제 이벤트
+  // [셀러 선택 견적요청하기] 모달창 내 삭제 이벤트
   const handleDelete = async () => {
     const rows = ref_estimate_partner.current.getInstance().getCheckedRows();
     // 선택한 체크박스가 없을 때 validation
     if (rows.length == 0) {
-      alert("삭제할 유통사를 선택해주세요.");
+      alert("셀러를 선택해 주세요.");
       return;
     }
     // 선택한 체크박스가 삭제되도록 하는 함수 removeCheckedRows
     ref_estimate_partner.current.getInstance().removeCheckedRows(true);
-    // 유통사 검색 grid의 선택버튼과 연동되도록 하는 on,off 변수
+    // 셀러 검색 grid의 선택버튼과 연동되도록 하는 on,off 변수
     setCheckDeleteKey("On");
   };
 
-  // 유통사 선택 견적요청하기
+  // 셀러 선택 견적요청하기
   const requestQuotationFromDistribution = async () => {
     // 추후 체크하는 견적 내역 변경때 사용
     let rows = ref.current.getInstance().getCheckedRows();
 
+    // 견적을 선택하지 않았을 때,
     if (rows.length === 0) {
-      alert("견적요청할 부품번호 선택은 필수입니다.");
+      alert("부품번호 선택은 필수입니다.");
       return;
     }
 
-    // 견적 리스트 부모 및 자식요소의 상태값 따로 뽑기
-    // 자식요소 견적(하단)
+    // 본 견적서
+    let parentRows = ref.current
+      .getInstance()
+      .getCheckedRows()
+      .filter((list) => list.data_type === "parent");
+
+    let checkParentStatus = parentRows.map(function (datum) {
+      return datum.qr_status;
+    });
+
+    function findIncompleteParentsStatus(element) {
+      if (element === "incomplete") {
+        return true;
+      }
+    }
+
+    const filteredIncompleteParents = checkParentStatus.filter(
+      findIncompleteParentsStatus
+    );
+
+    // 셀러 견적
     let childRows = ref.current
       .getInstance()
       .getCheckedRows()
@@ -566,12 +604,30 @@ export default function EstimateGrid(props) {
       "incomplete"
     );
 
-    if (childReplyStatus.length > 0) {
-      alert("유통사 선택 견적요청을 할 수 없습니다.");
+    // 셀러 견적(자식요소) 팝업창 막기
+    // 혹은 셀러 견적과 본 견적(부모견적/상위견적) 둘 다 미완료일 때, 견적요청 팝첩창 막기
+    if (
+      childReplyStatus.length > 0 ||
+      (filteredIncompleteParents.length > 0 && childRows.length > 0)
+    ) {
+      alert("셀러 선택 견적요청을 할 수 없습니다.");
       return;
     }
 
-    onOpen();
+    // 본래 견적서 클릭 했을 때
+    // 본 견적서와 셀러 견적서를 함께 클릭했을 때
+    if (
+      (parentRows.length > 0 && childRows.length > 0) ||
+      parentRows.length > 0
+    ) {
+      onOpen();
+      return;
+    }
+
+    // 셀러 견적만 선택했을 때, 팝업창
+    if (childRows.length > 0) {
+      alert("회신된 견적은 추가 요청할 수 없습니다.");
+    }
   };
 
   // child 집어 넣기
@@ -604,7 +660,7 @@ export default function EstimateGrid(props) {
     return make;
   };
 
-  // 유통사 선택 견적 요청한 후, 데이터 세팅
+  // 셀러 선택 견적 요청한 후, 데이터 세팅
   const handleAfterData = async () => {
     let rows = ref.current.getInstance().getCheckedRows();
     // parent가 아닌 경우는 모두 삭제
@@ -642,20 +698,21 @@ export default function EstimateGrid(props) {
     }
 
     try {
-      if (keywordRows == 0) {
-        alert("유통사 선택은 필수입니다.");
+      if (keywordRows == 0 && childrenRows == 0) {
+        alert("셀러 선택은 필수입니다.");
         return;
       }
       if (childrenRows == 0) {
-        alert("견적대상 유통사를 선택해야 합니다.");
+        alert("견적대상 셀러를 선택해 주세요.");
         return;
       }
+
       const res = await axios.post(
         process.env.ONDA_API_URL + `/api/quotation/reply`,
         body
       );
       if (res.data.status === 200) {
-        alert("견적 대상 유통사에 견적요청이 완료되었습니다.");
+        alert("견적 대상 셀러에 견적요청이 완료되었습니다.");
         setTimeout(function () {
           location.reload();
         }, 1000);
@@ -673,23 +730,56 @@ export default function EstimateGrid(props) {
   const replyQuotationToPandaParts = async () => {
     try {
       let body = { quotationLists: [] };
-      // 유통사 선택 견적만 추출 (child / 대체-선택)
+      // 셀러 선택 견적만 추출 (child / 대체-선택)
       let rows = ref.current.getInstance().getCheckedRows();
 
-      const childRows = ref.current
+      let childRows = ref.current
         .getInstance()
         .getCheckedRows()
         .filter((rows) => rows.data_type === "child");
 
+      let parentRows = ref.current
+        .getInstance()
+        .getCheckedRows()
+        .filter((list) => list.data_type === "parent");
+
+      let checkParentStatus = parentRows.map(function (datum) {
+        return datum.qr_status;
+      });
+
+      function findIncompleteParentsStatus(element) {
+        if (element === "incomplete") {
+          return true;
+        }
+      }
+
+      const filteredIncompleteParents = checkParentStatus.filter(
+        findIncompleteParentsStatus
+      );
+
       // 판다파츠 견적회신하기 validation
       if (childRows.length == 0) {
-        alert("판다파츠 견적회신할 부품번호 선택은 필수입니다.");
+        alert("부품번호를 선택해 주세요.");
+        return;
+      }
+      // 셀러 견적과 미완료 사우이 견적이 함께 클릭되어 있을 때 막는 validation
+      if (childRows.length > 0 && filteredIncompleteParents.length > 0) {
+        alert("미완료인 견적은 회신할 수 없습니다.");
         return;
       }
 
+      // 견적회신에 맞는 데이터 파싱 및 전송
+      // data에서 parent 속 es_no 빼기
       for (let i = 0; i < childRows.length; i++) {
-        // data에서 parent 속 es_no 빼기
+        // console.log("i의 개수 " + i);
+
+        // 견적상태가 미완료일 경우, 회신할 수 없도록 함
         for (let j = 0; j < data.length; j++) {
+          if (childRows[i].qr_state === "incomplete") {
+            alert("미완료인 견적은 회신할 수 없습니다.");
+            return;
+          }
+
           if (
             //  children의 parentKey = data의 rowKey
             // 죽, children에 없는 es_no를 data 속 parent의 es_no로 맞춰서 넣어주는 작업
@@ -723,78 +813,19 @@ export default function EstimateGrid(props) {
         }
       }
 
-      // 부모요소 견적(상단)
-      // 자녀요소 견적회신이 완료되면, 부묘요소의 견적 또한 완료로 뜬다.
-      let parentRows = ref.current
-        .getInstance()
-        .getCheckedRows()
-        .filter((list) => list.data_type === "parent");
-
-      // 부모요소 견적 상태값 배열
-      let checkParentsStatus = parentRows.map(function (parent) {
-        return parent.qr_status;
-      });
-
-      // 자식요소 견적 상태값 배열
-      let checkChildrenStatus = childRows.map(function (child) {
-        return child.qr_state;
-      });
-
-      const filterParentsStatus = (checkParentsStatus, value) => {
-        return checkParentsStatus.filter((ele) => {
-          return ele != value;
-        });
-      };
-
-      const filterChildrenStatus = (checkChildrenStatus, value) => {
-        return checkChildrenStatus.filter((ele) => {
-          return ele != value;
-        });
-      };
-
-      // 부묘요소의 견적이 완료일 때(incomplete와 inprogress)
-      // 그 중 부모요소 견적이 incomplete일 땐, 견적 회신이 이미 불가함.
-      const parentReplyStatus = filterParentsStatus(
-        checkParentsStatus,
-        "inprogress"
+      const res = await axios.post(
+        process.env.ONDA_API_URL + `/api/quotation/masterpanda`,
+        body
       );
 
-      const childReplyStatus = filterChildrenStatus(
-        checkChildrenStatus,
-        "replytomasterpanda"
-      );
-
-      console.log(childRows);
-
-      const childReplyStatusExceptComplete = filterChildrenStatus(
-        checkChildrenStatus,
-        "complete"
-      );
-
-      if (parentReplyStatus.length > 0) {
-        alert("판다파츠 견적회신이 완료된 견적을 회신할 수 없습니다.");
-        return;
+      if (res.data.status === 200) {
+        alert("견적 회신이 완료되었습니다.");
+        setTimeout(function () {
+          location.reload();
+        }, 1000);
+      } else {
+        alert(res.data.msg);
       }
-
-      if (childReplyStatus.length > 0) {
-        alert("판다파츠 견적회신이 완료된 견적을 회신할 수 없습니다.");
-        return;
-      }
-
-      // console.log(childReplyStatusExceptComplete.length);
-      // const res = await axios.post(
-      //   process.env.ONDA_API_URL + `/api/quotation/masterpanda`,
-      //   body
-      // );
-
-      // if (res.status === 201) {
-      //   alert("판다파츠 견적회신이 완료되었습니다.");
-      //   setTimeout(function () {
-      //     location.reload();
-      //   }, 1000);
-      // } else {
-      //   alert("다시 입력해주세요");
-      // }
     } catch (e) {
       console.log("err" + e);
     }
@@ -809,14 +840,22 @@ export default function EstimateGrid(props) {
     }
   };
 
-  // [유통사 선택 젼적 요청하기] 모달창 검색
+  const expandTuiGrid = () => {
+    try {
+      ref.current.getInstance().expandAll();
+    } catch (e) {
+      console.log("err " + e);
+    }
+  };
+
+  // [셀러 선택 젼적 요청하기] 모달창 검색
   const searchKeyword = useCallback((e) => {
     setKeyword(e.target.value);
   });
 
   const columns_def = [
     {
-      header: "유통사번호",
+      header: "셀러번호",
       name: "id",
       minWidth: 130,
       className: "font12",
@@ -825,7 +864,7 @@ export default function EstimateGrid(props) {
     },
 
     {
-      header: "유통사명",
+      header: "셀러명",
       name: "partner_name",
       minWidth: 260,
       className: "font12",
@@ -836,7 +875,8 @@ export default function EstimateGrid(props) {
   useEffect(() => {
     if (!data) {
       loadData(es_id);
-      getMbId();
+
+      ref.current.getInstance().on("onGridUpdated", (ev) => expandTuiGrid());
     }
   }, []);
 
@@ -862,29 +902,56 @@ export default function EstimateGrid(props) {
                   {" "}
                   <Button
                     type="button"
+                    className={style.estimate_list_detail_btn_cant}
+                  >
+                    셀러 선택 <br /> 견적요청하기
+                  </Button>
+                  <Button
+                    type="button"
+                    className={style.estimate_list_detail_btn_cant}
+                  >
+                    판다파츠 <br /> 견적회신하기
+                  </Button>
+                  <Button
+                    type="button"
                     className={style.estimate_list_detail_btn}
                     onClick={refreshTuiGrid}
-                    style={{ padding: "10px 30px", marginRight: "15px" }}
+                    style={{ padding: "15px" }}
                   >
                     갱신
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button
-                    type="button"
-                    className={style.estimate_list_detail_btn}
-                    onClick={requestQuotationFromDistribution}
-                  >
-                    유통사 선택 <br /> 견적요청하기
-                  </Button>
-                  <Button
-                    type="button"
-                    className={style.estimate_list_detail_btn}
-                    onClick={replyQuotationToPandaParts}
-                  >
-                    판다파츠 <br /> 견적회신하기
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      className={style.estimate_list_detail_btn}
+                      onClick={requestQuotationFromDistribution}
+                    >
+                      셀러 선택 <br /> 견적요청하기
+                    </Button>
+                  </>
+
+                  <>
+                    {blockReply === 1 ? (
+                      <Button
+                        type="button"
+                        className={style.estimate_list_detail_btn_cant}
+                      >
+                        판다파츠 <br /> 견적회신하기
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        className={style.estimate_list_detail_btn}
+                        onClick={replyQuotationToPandaParts}
+                      >
+                        판다파츠 <br /> 견적회신하기
+                      </Button>
+                    )}
+                  </>
+
                   <Button
                     type="button"
                     className={style.estimate_list_detail_btn}
@@ -925,14 +992,14 @@ export default function EstimateGrid(props) {
           isCentered
         >
           <ModalOverlay />
-          <ModalContent maxW="45rem" style={{ overflowY: "scroll" }}>
+          <Box maxW="45rem" className={style.ModalContent} style={{}}>
             <Center
               className="mb-5 "
               w="100%"
               flexDirection="column"
               justifyContent="center"
             >
-              <ModalHeader>유통사 견적 요청하기</ModalHeader>
+              <ModalHeader>셀러 견적 요청하기</ModalHeader>
             </Center>
             <ModalCloseButton />
 
@@ -952,7 +1019,7 @@ export default function EstimateGrid(props) {
                   justifyContent="center"
                 >
                   <Box fontWeight="bold" marginBottom={5}>
-                    유통사 검색&nbsp;&nbsp;
+                    셀러 검색&nbsp;&nbsp;
                     <input
                       type="text"
                       className="form-control form-control-sm bg-light border-primary small"
@@ -986,15 +1053,15 @@ export default function EstimateGrid(props) {
                     </Button>
                   </Box>
                 </Center>
-                <Grid
-                  ref={ref_partner}
-                  data={dataPartner}
-                  columns={columns_def}
-                  columnOptions={{ resizable: true }}
-                  heightResizable={true}
-                  bodyHeight={300}
-                  rowHeaders={[{ type: "checkbox", checked: false }]}
-                />
+                <div className="ref_partner">
+                  <Grid
+                    ref={ref_partner}
+                    data={dataPartner}
+                    columns={columns_def}
+                    bodyHeight={200}
+                    rowHeaders={[{ type: "checkbox", checked: false }]}
+                  />
+                </div>
               </Box>
             </Center>
 
@@ -1007,7 +1074,7 @@ export default function EstimateGrid(props) {
             >
               <Box w="500px">
                 <Box fontWeight="bold" style={{ marginBottom: "20px" }}>
-                  견적대상 유통사
+                  견적대상 셀러
                   <Button
                     w="60px"
                     type="button"
@@ -1026,9 +1093,7 @@ export default function EstimateGrid(props) {
                   ref={ref_estimate_partner}
                   data={dataSendPartner}
                   columns={columns_def}
-                  columnOptions={{ resizable: true }}
-                  heightResizable={true}
-                  bodyHeight={300}
+                  bodyHeight={200}
                   rowHeaders={[{ type: "checkbox", checked: false }]}
                 />
               </Box>
@@ -1055,11 +1120,11 @@ export default function EstimateGrid(props) {
                   size="sm"
                   isFullWidth
                 >
-                  요청하기
+                  견적요청하기
                 </Button>
               </Center>
             </ModalFooter>
-          </ModalContent>
+          </Box>
         </Modal>
       </>
     );
@@ -1080,44 +1145,28 @@ export default function EstimateGrid(props) {
               {es_id}
             </div>
             <div className={style.estimate_detail_right}>
-              {closeAllBtn === 1 ? (
-                <>
-                  {" "}
-                  <Button
-                    type="button"
-                    className={style.estimate_list_detail_btn}
-                    onClick={refreshTuiGrid}
-                    style={{ padding: "10px 30px", marginRight: "15px" }}
-                  >
-                    갱신
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    className={style.estimate_list_detail_btn}
-                    onClick={requestQuotationFromDistribution}
-                  >
-                    유통사 선택 <br /> 견적요청하기
-                  </Button>
-                  <Button
-                    type="button"
-                    className={style.estimate_list_detail_btn}
-                    onClick={replyQuotationToPandaParts}
-                  >
-                    판다파츠 <br /> 견적회신하기
-                  </Button>
-                  <Button
-                    type="button"
-                    className={style.estimate_list_detail_btn}
-                    onClick={refreshTuiGrid}
-                    style={{ padding: "15px" }}
-                  >
-                    갱신
-                  </Button>
-                </>
-              )}
+              <div>
+                <Button
+                  type="button"
+                  className={style.estimate_list_detail_btn_cant}
+                >
+                  셀러 선택 <br /> 견적요청하기
+                </Button>
+                <Button
+                  type="button"
+                  className={style.estimate_list_detail_btn_cant}
+                >
+                  판다파츠 <br /> 견적회신하기
+                </Button>
+                <Button
+                  type="button"
+                  className={style.estimate_list_detail_btn}
+                  onClick={refreshTuiGrid}
+                  style={{ padding: "15px" }}
+                >
+                  갱신
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1139,136 +1188,6 @@ export default function EstimateGrid(props) {
             />
           </div>
         </div>
-
-        <Modal
-          closeOnOverlayClick={false}
-          isOpen={isOpen}
-          onClose={onClose}
-          size="xl"
-          isCentered
-        >
-          <ModalOverlay />
-          <ModalContent maxW="45rem">
-            <Center
-              className="mb-5 "
-              w="100%"
-              flexDirection="column"
-              justifyContent="center"
-            >
-              <ModalHeader>유통사 견적 요청하기</ModalHeader>
-            </Center>
-            <ModalCloseButton />
-
-            <Center
-              className="mb-5 "
-              w="100%"
-              marginTop={30}
-              flexDirection="column"
-              justifyContent="center"
-            >
-              <Box w="500px">
-                <Center
-                  className="mb-5 "
-                  w="100%"
-                  marginTop={30}
-                  flexDirection="column"
-                  justifyContent="center"
-                >
-                  <Box fontWeight="bold" marginBottom={5}>
-                    유통사 검색&nbsp;&nbsp;
-                    <input
-                      type="text"
-                      className="form-control form-control-sm bg-light border-primary small"
-                      placeholder='PN, 회원명, 회원ID, 견적명 - 복수 검색가능 ("," 로 구분)'
-                      value={keyword}
-                      style={{ border: "1px solid black" }}
-                      onChange={searchKeyword}
-                    />
-                    &nbsp;&nbsp;
-                    <Button
-                      w="60px"
-                      type="button"
-                      color="#21618C"
-                      ml={3}
-                      size="sm"
-                      isFullWidth
-                      onClick={() => handleSearch()}
-                    >
-                      검색
-                    </Button>
-                    <Button
-                      w="60px"
-                      type="button"
-                      color="#21618C"
-                      ml={3}
-                      size="sm"
-                      isFullWidth
-                      onClick={() => handleSelect()}
-                    >
-                      선택
-                    </Button>
-                  </Box>
-                </Center>
-                <Grid
-                  ref={ref_partner}
-                  data={dataPartner}
-                  columns={columns_def}
-                  columnOptions={{ resizable: true }}
-                  heightResizable={true}
-                  bodyHeight={300}
-                  rowHeaders={[{ type: "checkbox", checked: false }]}
-                />
-              </Box>
-            </Center>
-
-            <Center
-              className="mb-5 "
-              w="100%"
-              marginTop={30}
-              flexDirection="column"
-              justifyContent="center"
-            >
-              <Box w="500px">
-                <Box fontWeight="bold">견적대상 유통사</Box>
-
-                <Grid
-                  ref={ref_estimate_partner}
-                  columns={columns_def}
-                  columnOptions={{ resizable: true }}
-                  heightResizable={true}
-                  bodyHeight={300}
-                  rowHeaders={[{ type: "checkbox", checked: false }]}
-                />
-              </Box>
-            </Center>
-
-            <ModalBody px={6} pb={0}></ModalBody>
-            <ModalFooter>
-              <Center
-                className="mb-5 "
-                w="100%"
-                marginTop={30}
-                flexDirection="column"
-                justifyContent="center"
-              >
-                <Button
-                  w="100px"
-                  type="button"
-                  color="#21618C"
-                  ml={3}
-                  onClick={() => {
-                    handleAfterData();
-                  }}
-                  onChange={() => {}}
-                  size="sm"
-                  isFullWidth
-                >
-                  요청하기
-                </Button>
-              </Center>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
       </>
     );
   }
